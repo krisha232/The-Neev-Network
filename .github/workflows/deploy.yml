@@ -1,4 +1,4 @@
-# Builds the site and publishes it to GitHub Pages every time you upload changes.
+# Builds the site and publishes it to GitHub Pages every time you push changes.
 name: Deploy to GitHub Pages
 
 on:
@@ -18,18 +18,23 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Install
-        run: npm install
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build
         env:
@@ -39,16 +44,27 @@ jobs:
           VITE_SCHOOL_NAME: ${{ secrets.VITE_SCHOOL_NAME }}
         run: |
           REPO="${{ github.event.repository.name }}"
-          if [[ "$REPO" == *.github.io ]]; then export BASE_PATH="/"; else export BASE_PATH="/$REPO/"; fi
+
+          if [[ "$REPO" == *.github.io ]]; then
+            export BASE_PATH="/"
+          else
+            export BASE_PATH="/$REPO/"
+          fi
+
+          echo "Building with BASE_PATH=$BASE_PATH"
+
           npm run build
-          # Lets links like /profile/... work when opened directly or refreshed
+
           cp dist/index.html dist/404.html
 
-      - uses: actions/configure-pages@v5
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
-      - id: deployment
+      - name: Deploy
+        id: deployment
         uses: actions/deploy-pages@v4
